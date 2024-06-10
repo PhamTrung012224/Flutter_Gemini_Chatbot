@@ -387,12 +387,9 @@ class MessageWidget extends StatelessWidget {
               children: [
                 if (text != null)
                   AnimatedTextKit(
-                    animatedTexts: [TyperAnimatedText(text!)],
+                    animatedTexts: [TyperAnimatedText(text!,speed: const Duration(milliseconds: 10))],
                     isRepeatingAnimation: false,
-                    pause: const Duration(microseconds: 2),
-                    onFinished: () {
-                          MarkdownBody(data: text!);
-                    },
+                    pause: const Duration(milliseconds: 1),
                   ),
                 if (image != null)
                   Container(
