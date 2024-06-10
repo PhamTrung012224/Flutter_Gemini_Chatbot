@@ -51,7 +51,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(bottomLeft: Radius.circular(36),bottomRight: Radius.circular(36))),
+            borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36))),
         backgroundColor: const Color(0xFFC5E5FA),
         centerTitle: true,
         titleTextStyle: TextStyle(
@@ -273,62 +275,36 @@ class _ChatWidgetState extends State<ChatWidget> {
     try {
       if (imageInput?.isEmpty ?? true) {
         _generatedContent.add((image: null, text: message, fromUser: true));
-        final response = _chat.sendMessageStream(
+        final response = await _chat.sendMessage(
           Content.text(message),
         );
-        await for (var chunk in response) {
-          Future.delayed(const Duration(milliseconds: 250));
-          if (_generatedContent.last.fromUser == true) {
-            final text = chunk.text;
-            setState(() {
-              _generatedContent.add((image: null, text: text, fromUser: false));
-              _textFieldFocus.unfocus();
-            });
-          } else {
-            final text =
-                '${_generatedContent.removeAt(_generatedContent.length - 1).text}${chunk.text}';
-            setState(() {
-              _generatedContent.add((image: null, text: text, fromUser: false));
-              _scrollController.animateTo(
-                _scrollController.position.maxScrollExtent,
-                duration: const Duration(milliseconds: 700),
-                curve: Curves.easeOut,
-              );
-            });
-          }
-        }
+        var text = response.text;
+        setState(() {
+          _generatedContent.add((image: null, text: text, fromUser: false));
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.easeOut,
+          );
+        });
       } else {
         _generatedContent
             .add((image: imageInput, text: message, fromUser: true));
-        final response = _chat
-            .sendMessageStream(Content.multi([TextPart(message), ...data!]));
-
+        final response = await _chat
+            .sendMessage(Content.multi([TextPart(message), ...data!]));
+        var text = response.text;
         //reset image data
         imageInput = [];
         data = [];
         //reset image data
-
-        await for (var chunk in response) {
-          Future.delayed(const Duration(milliseconds: 250));
-          if (_generatedContent.last.fromUser == true) {
-            final text = chunk.text;
-            setState(() {
-              _generatedContent.add((image: null, text: text, fromUser: false));
-              _textFieldFocus.unfocus();
-            });
-          } else {
-            final text =
-                '${_generatedContent.removeAt(_generatedContent.length - 1).text}${chunk.text}';
-            setState(() {
-              _generatedContent.add((image: null, text: text, fromUser: false));
-              _scrollController.animateTo(
-                _scrollController.position.maxScrollExtent,
-                duration: const Duration(milliseconds: 700),
-                curve: Curves.easeOut,
-              );
-            });
-          }
-        }
+        setState(() {
+          _generatedContent.add((image: null, text: text, fromUser: false));
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.easeOut,
+          );
+        });
       }
 
       setState(() {
@@ -410,8 +386,14 @@ class MessageWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (text != null)
-                  AnimatedTextKit(animatedTexts: [TyperAnimatedText(text!)],isRepeatingAnimation: false,repeatForever: false,),
-                  // MarkdownBody(data: text!),
+                  AnimatedTextKit(
+                    animatedTexts: [TyperAnimatedText(text!)],
+                    isRepeatingAnimation: false,
+                    pause: const Duration(microseconds: 2),
+                    onFinished: () {
+                          MarkdownBody(data: text!);
+                    },
+                  ),
                 if (image != null)
                   Container(
                     decoration: BoxDecoration(
