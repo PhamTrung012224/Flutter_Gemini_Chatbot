@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
@@ -116,9 +117,9 @@ class _ChatWidgetState extends State<ChatWidget> {
       (_) => _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(
-          milliseconds: 750,
+          milliseconds: 300,
         ),
-        curve: Curves.easeOutCirc,
+        curve: Curves.easeOut,
       ),
     );
   }
@@ -164,6 +165,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                           text: content.text,
                           image: content.image,
                           isFromUser: content.fromUser,
+                          scrollController: _scrollController,
                         );
                       },
                       itemCount: _generatedContent.length,
@@ -270,6 +272,7 @@ class _ChatWidgetState extends State<ChatWidget> {
   Future<void> _sendChatMessage(String message) async {
     setState(() {
       _loading = true;
+      _textFieldFocus.unfocus();
     });
 
     try {
@@ -281,11 +284,6 @@ class _ChatWidgetState extends State<ChatWidget> {
         var text = response.text;
         setState(() {
           _generatedContent.add((image: null, text: text, fromUser: false));
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 700),
-            curve: Curves.easeOut,
-          );
         });
       } else {
         _generatedContent
@@ -299,11 +297,6 @@ class _ChatWidgetState extends State<ChatWidget> {
         //reset image data
         setState(() {
           _generatedContent.add((image: null, text: text, fromUser: false));
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 700),
-            curve: Curves.easeOut,
-          );
         });
       }
 
@@ -347,23 +340,45 @@ class _ChatWidgetState extends State<ChatWidget> {
   }
 }
 
-class MessageWidget extends StatelessWidget {
+class MessageWidget extends StatefulWidget {
   const MessageWidget({
     super.key,
     this.image,
     this.text,
+    this.scrollController,
     required this.isFromUser,
   });
 
   final List<Image>? image;
   final String? text;
+  final ScrollController? scrollController;
   final bool isFromUser;
 
   @override
+  State<MessageWidget> createState() => _MessageState();
+}
+
+class _MessageState extends State<MessageWidget> with AutomaticKeepAliveClientMixin {
+  bool showAnimation=true;
+
+  void _scrollDown() {
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => widget.scrollController!.animateTo(
+        widget.scrollController!.position.maxScrollExtent,
+        duration: const Duration(
+          milliseconds: 500,
+        ),
+        curve: Curves.easeOut,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Row(
       mainAxisAlignment:
-          isFromUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+          widget.isFromUser ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: [
         Flexible(
           flex: 1,
@@ -372,7 +387,7 @@ class MessageWidget extends StatelessWidget {
               maxWidth: MediaQuery.of(context).size.width * 0.8,
             ),
             decoration: BoxDecoration(
-              color: isFromUser
+              color: widget.isFromUser
                   ? Theme.of(context).colorScheme.primaryContainer
                   : Theme.of(context).colorScheme.surfaceVariant,
               borderRadius: BorderRadius.circular(18),
@@ -385,21 +400,35 @@ class MessageWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (text != null)
-                  AnimatedTextKit(
-                    animatedTexts: [TyperAnimatedText(text!,speed: const Duration(milliseconds: 10))],
-                    isRepeatingAnimation: false,
-                    pause: const Duration(milliseconds: 1),
-                  ),
-                if (image != null)
+                if (widget.text != null && widget.isFromUser == false)
+                  showAnimation
+                      ? AnimatedTextKit(
+                          animatedTexts: [
+                            TyperAnimatedText(widget.text!,
+                                speed: const Duration(milliseconds: 8))
+                          ],
+                          isRepeatingAnimation: false,
+                          onFinished: () {
+                            setState(() {
+                              print('build');
+                              showAnimation = false;
+                              _scrollDown();
+                            });
+                          },
+                          pause: const Duration(milliseconds: 1),
+                        )
+                      : MarkdownBody(data: widget.text!),
+                if (widget.text != null && widget.isFromUser == true)
+                  Text('${widget.text}'),
+                if (widget.image != null)
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    height: (image!.length / 3).ceil() *
+                    height: (widget.image!.length / 3).ceil() *
                         (MediaQuery.of(context).size.width * 0.8 / 3),
                     child: GridView.builder(
-                      itemCount: image!.length,
+                      itemCount: widget.image!.length,
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 3,
@@ -412,7 +441,7 @@ class MessageWidget extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Image(
-                            image: image![idx].image,
+                            image: widget.image![idx].image,
                             width: MediaQuery.of(context).size.width * 0.8 / 3,
                             height: MediaQuery.of(context).size.width * 0.8 / 3,
                             fit: BoxFit.cover,
@@ -428,4 +457,8 @@ class MessageWidget extends StatelessWidget {
       ],
     );
   }
+
+  @override
+
+  bool get wantKeepAlive => true;
 }
