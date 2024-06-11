@@ -51,7 +51,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(bottomLeft: Radius.circular(36),bottomRight: Radius.circular(36))),
+            borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36))),
         backgroundColor: const Color(0xFFC5E5FA),
         centerTitle: true,
         titleTextStyle: TextStyle(
@@ -410,8 +412,14 @@ class MessageWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (text != null)
-                  AnimatedTextKit(animatedTexts: [TyperAnimatedText(text!)],isRepeatingAnimation: false,repeatForever: false,),
-                  // MarkdownBody(data: text!),
+                  AnimatedTextKit(
+                    animatedTexts: [
+                      TyperAnimatedText(text!,
+                          speed: const Duration(milliseconds: 9))
+                    ],
+                    isRepeatingAnimation: false,
+                  ),
+                // MarkdownBody(data: text!),
                 if (image != null)
                   Container(
                     decoration: BoxDecoration(
