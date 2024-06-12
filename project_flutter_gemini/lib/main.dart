@@ -88,9 +88,9 @@ class _ChatWidgetState extends State<ChatWidget> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
   final FocusNode _textFieldFocus = FocusNode();
-  final List<({List<Image>? image, String? text, bool fromUser})>
+  final List<({List<Image>? image, List<String>? text, bool fromUser})>
       _generatedContent =
-      <({List<Image>? image, String? text, bool fromUser})>[];
+      <({List<Image>? image, List<String>? text, bool fromUser})>[];
   bool _loading = false;
 
   @override
@@ -164,6 +164,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                           text: content.text,
                           image: content.image,
                           isFromUser: content.fromUser,
+                          scrollController: _scrollController,
                         );
                       },
                       itemCount: _generatedContent.length,
@@ -274,63 +275,35 @@ class _ChatWidgetState extends State<ChatWidget> {
 
     try {
       if (imageInput?.isEmpty ?? true) {
-        _generatedContent.add((image: null, text: message, fromUser: true));
+        _generatedContent.add((image: null, text: [message], fromUser: true));
         final response = _chat.sendMessageStream(
           Content.text(message),
         );
+        List<String> text = [];
         await for (var chunk in response) {
-          Future.delayed(const Duration(milliseconds: 250));
-          if (_generatedContent.last.fromUser == true) {
-            final text = chunk.text;
-            setState(() {
-              _generatedContent.add((image: null, text: text, fromUser: false));
-              _textFieldFocus.unfocus();
-            });
-          } else {
-            final text =
-                '${_generatedContent.removeAt(_generatedContent.length - 1).text}${chunk.text}';
-            setState(() {
-              _generatedContent.add((image: null, text: text, fromUser: false));
-              _scrollController.animateTo(
-                _scrollController.position.maxScrollExtent,
-                duration: const Duration(milliseconds: 700),
-                curve: Curves.easeOut,
-              );
-            });
-          }
+          text.add(chunk.text!);
         }
+        setState(() {
+          _generatedContent.add((image: null, text: text, fromUser: false));
+        });
       } else {
         _generatedContent
-            .add((image: imageInput, text: message, fromUser: true));
+            .add((image: imageInput, text: [message], fromUser: true));
         final response = _chat
             .sendMessageStream(Content.multi([TextPart(message), ...data!]));
-
+        List<String> text = [];
+        await for (var chunk in response) {
+          if (_generatedContent.last.fromUser == true) {
+            text.add(chunk.text!);
+          }
+        }
         //reset image data
         imageInput = [];
         data = [];
         //reset image data
-
-        await for (var chunk in response) {
-          Future.delayed(const Duration(milliseconds: 250));
-          if (_generatedContent.last.fromUser == true) {
-            final text = chunk.text;
-            setState(() {
-              _generatedContent.add((image: null, text: text, fromUser: false));
-              _textFieldFocus.unfocus();
-            });
-          } else {
-            final text =
-                '${_generatedContent.removeAt(_generatedContent.length - 1).text}${chunk.text}';
-            setState(() {
-              _generatedContent.add((image: null, text: text, fromUser: false));
-              _scrollController.animateTo(
-                _scrollController.position.maxScrollExtent,
-                duration: const Duration(milliseconds: 700),
-                curve: Curves.easeOut,
-              );
-            });
-          }
-        }
+        setState(() {
+          _generatedContent.add((image: null, text: text, fromUser: false));
+        });
       }
 
       setState(() {
@@ -373,23 +346,59 @@ class _ChatWidgetState extends State<ChatWidget> {
   }
 }
 
-class MessageWidget extends StatelessWidget {
+class MessageWidget extends StatefulWidget {
   const MessageWidget({
     super.key,
     this.image,
     this.text,
+    this.scrollController,
     required this.isFromUser,
   });
 
   final List<Image>? image;
-  final String? text;
+  final List<String>? text;
   final bool isFromUser;
+  final ScrollController? scrollController;
+
+  @override
+  State<MessageWidget> createState() => _MessageState();
+}
+
+class _MessageState extends State<MessageWidget> {
+  bool isAnimated = true;
+  List<AnimatedText> animationText = [];
+  String message = '';
+
+  void _scrollDown() {
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => widget.scrollController!.animateTo(
+        widget.scrollController!.position.maxScrollExtent,
+        duration: const Duration(
+          milliseconds: 800,
+        ),
+        curve: Curves.ease,
+      ),
+    );
+  }
+
+  void getText() {
+    for (var i in widget.text!) {
+      animationText
+          .add(TyperAnimatedText(i, speed: const Duration(milliseconds: 7)));
+    }
+  }
+
+  @override
+  void initState() {
+    getText();
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment:
-          isFromUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+          widget.isFromUser ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: [
         Flexible(
           flex: 1,
@@ -398,7 +407,7 @@ class MessageWidget extends StatelessWidget {
               maxWidth: MediaQuery.of(context).size.width * 0.8,
             ),
             decoration: BoxDecoration(
-              color: isFromUser
+              color: widget.isFromUser
                   ? Theme.of(context).colorScheme.primaryContainer
                   : Theme.of(context).colorScheme.surfaceVariant,
               borderRadius: BorderRadius.circular(18),
@@ -411,24 +420,39 @@ class MessageWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (text != null)
-                  AnimatedTextKit(
-                    animatedTexts: [
-                      TyperAnimatedText(text!,
-                          speed: const Duration(milliseconds: 9))
-                    ],
-                    isRepeatingAnimation: false,
-                  ),
-                // MarkdownBody(data: text!),
-                if (image != null)
+                if (message.isNotEmpty) MarkdownBody(data: message),
+                if (widget.text != null && widget.isFromUser == false)
+                  isAnimated
+                      ? AnimatedTextKit(
+                          animatedTexts: animationText,
+                          onNextBeforePause: (p0, p1) {
+                            setState(() {
+                              message += animationText[p0].text;
+                            });
+                          },
+                          onNext: (p0, p1) {
+                            _scrollDown();
+                          },
+                          pause: const Duration(microseconds: 800),
+                          onFinished: () {
+                            setState(() {
+                              isAnimated = false;
+                            });
+                          },
+                          isRepeatingAnimation: false,
+                        )
+                      : const MarkdownBody(data: ''),
+                if (widget.text != null && widget.isFromUser == true)
+                  Text(widget.text!.first),
+                if (widget.image != null)
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    height: (image!.length / 3).ceil() *
+                    height: (widget.image!.length / 3).ceil() *
                         (MediaQuery.of(context).size.width * 0.8 / 3),
                     child: GridView.builder(
-                      itemCount: image!.length,
+                      itemCount: widget.image!.length,
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 3,
@@ -441,7 +465,7 @@ class MessageWidget extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Image(
-                            image: image![idx].image,
+                            image: widget.image![idx].image,
                             width: MediaQuery.of(context).size.width * 0.8 / 3,
                             height: MediaQuery.of(context).size.width * 0.8 / 3,
                             fit: BoxFit.cover,
