@@ -119,8 +119,8 @@ class _ChatWidgetState extends State<ChatWidget> {
 
   void _scrollDown() {
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scrollController!.animateTo(
-        _scrollController!.position.maxScrollExtent,
+      (_) => _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
         duration: const Duration(
           milliseconds: 400,
         ),
