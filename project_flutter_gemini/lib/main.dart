@@ -54,7 +54,7 @@ class _ChatScreenState extends State<ChatScreen> {
             borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(36),
                 bottomRight: Radius.circular(36))),
-        backgroundColor: const Color(0xFFC5E5FA),
+        backgroundColor: const Color(0xFFF1F7FF),
         centerTitle: true,
         titleTextStyle: TextStyle(
             color: const Color(0xFF3B8BEE),
@@ -111,14 +111,20 @@ class _ChatWidgetState extends State<ChatWidget> {
     );
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   void _scrollDown() {
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
+      (_) => _scrollController!.animateTo(
+        _scrollController!.position.maxScrollExtent,
         duration: const Duration(
-          milliseconds: 750,
+          milliseconds: 400,
         ),
-        curve: Curves.easeOutCirc,
+        curve: Curves.easeOut,
       ),
     );
   }
@@ -271,11 +277,15 @@ class _ChatWidgetState extends State<ChatWidget> {
   Future<void> _sendChatMessage(String message) async {
     setState(() {
       _loading = true;
+      _textFieldFocus.unfocus();
     });
 
     try {
       if (imageInput?.isEmpty ?? true) {
-        _generatedContent.add((image: null, text: [message], fromUser: true));
+        setState(() {
+          _generatedContent.add((image: null, text: [message], fromUser: true));
+          _scrollDown();
+        });
         final response = _chat.sendMessageStream(
           Content.text(message),
         );
@@ -287,20 +297,26 @@ class _ChatWidgetState extends State<ChatWidget> {
           _generatedContent.add((image: null, text: text, fromUser: false));
         });
       } else {
-        _generatedContent
-            .add((image: imageInput, text: [message], fromUser: true));
+        setState(() {
+          _generatedContent
+              .add((image: imageInput, text: [message], fromUser: true));
+          _scrollDown();
+        });
+
         final response = _chat
             .sendMessageStream(Content.multi([TextPart(message), ...data!]));
+        //reset image data
+        imageInput = [];
+        data = [];
+        setState(() {});
+        //reset image data
         List<String> text = [];
         await for (var chunk in response) {
           if (_generatedContent.last.fromUser == true) {
             text.add(chunk.text!);
           }
         }
-        //reset image data
-        imageInput = [];
-        data = [];
-        //reset image data
+
         setState(() {
           _generatedContent.add((image: null, text: text, fromUser: false));
         });
@@ -308,7 +324,6 @@ class _ChatWidgetState extends State<ChatWidget> {
 
       setState(() {
         _loading = false;
-        _scrollDown();
       });
     } catch (e) {
       _showError(e.toString());
@@ -364,7 +379,8 @@ class MessageWidget extends StatefulWidget {
   State<MessageWidget> createState() => _MessageState();
 }
 
-class _MessageState extends State<MessageWidget> {
+class _MessageState extends State<MessageWidget>
+    with AutomaticKeepAliveClientMixin {
   bool isAnimated = true;
   List<AnimatedText> animationText = [];
   String message = '';
@@ -374,9 +390,9 @@ class _MessageState extends State<MessageWidget> {
       (_) => widget.scrollController!.animateTo(
         widget.scrollController!.position.maxScrollExtent,
         duration: const Duration(
-          milliseconds: 800,
+          milliseconds: 2800,
         ),
-        curve: Curves.ease,
+        curve: Curves.easeOut,
       ),
     );
   }
@@ -384,7 +400,7 @@ class _MessageState extends State<MessageWidget> {
   void getText() {
     for (var i in widget.text!) {
       animationText
-          .add(TyperAnimatedText(i, speed: const Duration(milliseconds: 7)));
+          .add(TyperAnimatedText(i, speed: const Duration(milliseconds: 6)));
     }
   }
 
@@ -396,6 +412,7 @@ class _MessageState extends State<MessageWidget> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Row(
       mainAxisAlignment:
           widget.isFromUser ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -481,4 +498,7 @@ class _MessageState extends State<MessageWidget> {
       ],
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }
