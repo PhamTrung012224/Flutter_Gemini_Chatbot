@@ -15,7 +15,7 @@ import 'package:docx_to_text/docx_to_text.dart';
 ///
 /// To learn how to generate and specify this key,
 /// check out the README file of this sample.
-const String _apiKey = 'AIzaSyB1ba064lrSShRi-uQbJNnewAPdNKdt3V8';
+const String _apiKey = String.fromEnvironment('API_KEY');
 
 void main() {
   runApp(const GenerativeAISample());
